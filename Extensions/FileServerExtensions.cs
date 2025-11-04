@@ -4,24 +4,44 @@ namespace FileSyncServer;
 
 public static class FileServerExtensions
 {
+    public static string NormalizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return AppContext.BaseDirectory;
+
+        // Если путь абсолютный — оставляем
+        if (Path.IsPathRooted(path))
+            return Path.GetFullPath(path);
+
+        // Если относительный — строим относительно каталога приложения
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
+    }
+
     public static void MapStaticFiles(this WebApplication app, FileSyncConfig cfg)
     {
+        var publicPath = NormalizePath(cfg.Files.Public);
+        var privatePath = NormalizePath(cfg.Files.Private);
+        var mirrorRoot = NormalizePath(cfg.Files.Mirror.BasePath);
+
+        Directory.CreateDirectory(publicPath);
+        Directory.CreateDirectory(privatePath);
+        Directory.CreateDirectory(mirrorRoot);
+
+        // --- PUBLIC ---
         app.UseStaticFiles(new StaticFileOptions
         {
-            FileProvider = new PhysicalFileProvider(cfg.Files.Public),
+            FileProvider = new PhysicalFileProvider(publicPath),
             RequestPath = "/public"
         });
 
+        // --- PRIVATE ---
         app.UseStaticFiles(new StaticFileOptions
         {
-            FileProvider = new PhysicalFileProvider(cfg.Files.Private),
+            FileProvider = new PhysicalFileProvider(privatePath),
             RequestPath = "/private"
         });
 
-        var mirrorRoot = Path.Combine("/data/mirror/");
-        if (!Directory.Exists(mirrorRoot))
-            Directory.CreateDirectory(mirrorRoot);
-
+        // --- MIRROR ---
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = new PhysicalFileProvider(mirrorRoot),

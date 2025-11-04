@@ -13,13 +13,15 @@ config:
     cert_path_private: cert/server.key
   sync:
     schedule:
-      - 0 0 3 * * *
+      - 0 3 * * *
 
 files:
-  private: data/private/
-  public: data/public/
+  private: ../data/private/
+  public: ../data/public/
   mirror:
-    unblock_lists:
-      dnsmasq-nfset.lst: https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-dnsmasq-nfset.lst
-    lampa:
-      etor.js: https://cub.red/plugin/etor
+    base_path: ../data/mirror
+    data:
+      unblock_lists:
+        dnsmasq-nfset.lst: https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-dnsmasq-nfset.lst
+      lampa:
+        etor.js: https://cub.red/plugin/etor

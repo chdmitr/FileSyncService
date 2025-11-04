@@ -22,7 +22,7 @@ foreach (var auth in cfg.Config.Auth)
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ---------- ЛОГИРОВАНИЕ ----------
+// Логирование
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(opt =>
 {
@@ -30,7 +30,7 @@ builder.Logging.AddSimpleConsole(opt =>
     opt.SingleLine = true;
 });
 
-// путь к лог-файлу и параметры ротации
+// Путь к лог-файлу и параметры ротации
 var logPath = cfg.Config.Log.Path;
 if (string.IsNullOrWhiteSpace(logPath))
 {
@@ -57,6 +57,18 @@ var app = builder.Build();
 
 app.UseMiddleware<AuthMiddleware>(cfg);
 app.MapStaticFiles(cfg);
+
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("--------------------------------------------------");
+logger.LogInformation(" FileSyncServer started");
+logger.LogInformation("--------------------------------------------------");
+logger.LogInformation("HTTPS port:        {Port}", cfg.Config.Https.Port);
+logger.LogInformation("Log file:          {LogPath}", Path.GetFullPath(cfg.Config.Log.Path));
+logger.LogInformation("Public directory:  {Path}", FileSyncServer.FileServerExtensions.NormalizePath(cfg.Files.Public));
+logger.LogInformation("Private directory: {Path}", FileSyncServer.FileServerExtensions.NormalizePath(cfg.Files.Private));
+logger.LogInformation("Mirror root:       {Path}", FileSyncServer.FileServerExtensions.NormalizePath("data/mirror"));
+logger.LogInformation("Sync schedule:     {Schedule}", string.Join(", ", cfg.Config.Sync.Schedule));
+logger.LogInformation("--------------------------------------------------");
 
 // --- ручной триггер только с localhost ---
 app.MapPost("/sync/now", async (HttpContext ctx, SyncService sync, ILogger<Program> log) =>

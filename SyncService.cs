@@ -1,20 +1,20 @@
-using System.Net.Http.Headers;
 using Cronos;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace FileSyncServer
 {
     public class SyncService : BackgroundService
     {
         private readonly FileSyncConfig _cfg;
-        private readonly ILogger<SyncService> _log;
-        private readonly HttpClient _client = new();
+        private readonly ILogger<SyncService> _logger;
+        private readonly HttpClient _client = new()
+        {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
 
         public SyncService(FileSyncConfig cfg, ILogger<SyncService> log)
         {
             _cfg = cfg;
-            _log = log;
+            _logger = log;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -23,7 +23,7 @@ namespace FileSyncServer
                 .Select(s => CronExpression.Parse(s))
                 .ToList();
 
-            _log.LogInformation("Sync scheduler started with {Count} cron rules", schedules.Count);
+            _logger.LogInformation("Sync scheduler started with {Count} cron rules", schedules.Count);
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -34,10 +34,10 @@ namespace FileSyncServer
                     .Select(t => t!.Value)
                     .ToList();
 
-                var delay = nextRuns.Any() ? nextRuns.Min() - now : TimeSpan.FromHours(12);
+                var delay = nextRuns.Count != 0 ? nextRuns.Min() - now : TimeSpan.FromHours(12);
                 if (delay < TimeSpan.Zero) delay = TimeSpan.FromMinutes(1);
 
-                _log.LogInformation("Next sync in {Delay}", delay);
+                _logger.LogInformation("Next sync in {Delay}", delay);
                 await Task.Delay(delay, stoppingToken);
 
                 await SyncAll();
@@ -46,11 +46,13 @@ namespace FileSyncServer
 
         public async Task SyncAll()
         {
-            _log.LogInformation("Starting synchronization...");
+            _logger.LogInformation("Starting synchronization...");
 
-            foreach (var category in _cfg.Files.Mirror)
+            var mirrorBasePath = FileServerExtensions.NormalizePath(_cfg.Files.Mirror!.BasePath);
+
+            foreach (var category in _cfg.Files.Mirror.Data)
             {
-                var dir = Path.Combine("/data/mirror/", category.Key);
+                var dir = Path.Combine(mirrorBasePath, category.Key);
                 Directory.CreateDirectory(dir);
 
                 foreach (var kv in category.Value)
@@ -62,7 +64,7 @@ namespace FileSyncServer
                 }
             }
 
-            _log.LogInformation("Synchronization finished.");
+            _logger.LogInformation("Synchronization finished.");
         }
 
         private async Task SyncFile(string localPath, string url)
@@ -80,18 +82,22 @@ namespace FileSyncServer
                 var resp = await _client.SendAsync(req);
                 if (resp.StatusCode == System.Net.HttpStatusCode.NotModified)
                 {
-                    _log.LogDebug("No update for {File}", localPath);
+                    _logger.LogDebug("No update for {File}", localPath);
                     return;
                 }
 
                 resp.EnsureSuccessStatusCode();
                 var bytes = await resp.Content.ReadAsByteArrayAsync();
                 await File.WriteAllBytesAsync(localPath, bytes);
-                _log.LogInformation("Updated {File} ({Size} bytes)", localPath, bytes.Length);
+                _logger.LogInformation("Updated {File} ({Size} bytes)", localPath, bytes.Length);
+            }
+            catch (TaskCanceledException)
+            {
+                _logger.LogWarning("Timeout while downloading {Url}", url);
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, "Error syncing {File}", localPath);
+                _logger.LogError(ex, "Error syncing {File}", localPath);
             }
         }
     }

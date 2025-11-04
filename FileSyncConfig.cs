@@ -39,7 +39,7 @@ public class FileSyncConfig
 
         public class SyncSection
         {
-            public List<string> Schedule { get; set; } = new();
+            public List<string> Schedule { get; set; } = [];
         }
     }
 
@@ -47,6 +47,13 @@ public class FileSyncConfig
     {
         public string Private { get; set; } = "";
         public string Public { get; set; } = "";
-        public Dictionary<string, Dictionary<string, string>> Mirror { get; set; } = new();
+        public required MirrorSection Mirror { get; set; }
+
+        public class MirrorSection
+        {
+            public string BasePath { get; set; } = "";
+
+            public Dictionary<string, Dictionary<string, string>> Data { get; set; } = [];
+        }
     }
 }

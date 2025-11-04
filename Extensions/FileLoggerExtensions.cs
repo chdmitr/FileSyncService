@@ -1,3 +1,5 @@
+#pragma warning disable 8633
+
 using System.Text;
 
 namespace FileSyncServer;
@@ -33,20 +35,12 @@ public static class FileLoggerExtensions
 
         public void Dispose() { }
 
-        private class RotatingFileLogger : ILogger
+        private class RotatingFileLogger(string path, int maxBytes, int maxFiles, object lockObj) : ILogger
         {
-            private readonly string _path;
-            private readonly int _maxBytes;
-            private readonly int _maxFiles;
-            private readonly object _lock;
-
-            public RotatingFileLogger(string path, int maxBytes, int maxFiles, object lockObj)
-            {
-                _path = path;
-                _maxBytes = maxBytes;
-                _maxFiles = maxFiles;
-                _lock = lockObj;
-            }
+            private readonly string _path = path;
+            private readonly int _maxBytes = maxBytes;
+            private readonly int _maxFiles = maxFiles;
+            private readonly object _lock = lockObj;
 
             public IDisposable BeginScope<TState>(TState state) => default!;
 
