@@ -15,9 +15,17 @@ var cfg = deserializer.Deserialize<FileSyncConfig>(yaml);
 foreach (var auth in cfg.Config.Auth)
 {
     if (auth.Username.StartsWith("env."))
-        auth.Username = Environment.GetEnvironmentVariable(auth.Username["env.".Length..]) ?? "";
+    {
+        var envVar = Environment.GetEnvironmentVariable(auth.Username["env.".Length..])
+            ?? throw new InvalidOperationException($"Missing environment variable: {auth.Username} (for username)");
+        auth.Username = envVar;
+    }
     if (auth.Password.StartsWith("env."))
-        auth.Password = Environment.GetEnvironmentVariable(auth.Password["env.".Length..]) ?? "";
+    {
+        var envVar = Environment.GetEnvironmentVariable(auth.Username["env.".Length..])
+            ?? throw new InvalidOperationException($"Missing environment variable: {auth.Password} (for username)");
+        auth.Password = envVar;
+    }
 }
 
 var builder = WebApplication.CreateBuilder(args);
