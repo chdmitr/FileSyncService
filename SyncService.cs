@@ -82,7 +82,7 @@ namespace FileSyncServer
                 var resp = await _client.SendAsync(req);
                 if (resp.StatusCode == System.Net.HttpStatusCode.NotModified)
                 {
-                    _logger.LogDebug("No update for {File}", localPath);
+                    _logger.LogInformation("No update for {File}", localPath);
                     return;
                 }
 
