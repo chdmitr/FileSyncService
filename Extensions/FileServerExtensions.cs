@@ -32,6 +32,7 @@ public static class FileServerExtensions
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = publicProvider,
+            ServeUnknownFileTypes = true,
             RequestPath = "/public"
         });
         app.UseDirectoryBrowser(new DirectoryBrowserOptions
@@ -45,6 +46,7 @@ public static class FileServerExtensions
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = privateProvider,
+            ServeUnknownFileTypes = true,
             RequestPath = "/private"
         });
         app.UseDirectoryBrowser(new DirectoryBrowserOptions
@@ -58,6 +60,7 @@ public static class FileServerExtensions
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = mirrorProvider,
+            ServeUnknownFileTypes = true,
             RequestPath = "/mirror"
         });
         app.UseDirectoryBrowser(new DirectoryBrowserOptions
