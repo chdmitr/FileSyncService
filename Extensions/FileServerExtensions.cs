@@ -28,23 +28,41 @@ public static class FileServerExtensions
         Directory.CreateDirectory(mirrorRoot);
 
         // --- PUBLIC ---
+        var publicProvider = new PhysicalFileProvider(publicPath);
         app.UseStaticFiles(new StaticFileOptions
         {
-            FileProvider = new PhysicalFileProvider(publicPath),
+            FileProvider = publicProvider,
+            RequestPath = "/public"
+        });
+        app.UseDirectoryBrowser(new DirectoryBrowserOptions
+        {
+            FileProvider = publicProvider,
             RequestPath = "/public"
         });
 
         // --- PRIVATE ---
+        var privateProvider = new PhysicalFileProvider(privatePath);
         app.UseStaticFiles(new StaticFileOptions
         {
-            FileProvider = new PhysicalFileProvider(privatePath),
+            FileProvider = privateProvider,
+            RequestPath = "/private"
+        });
+        app.UseDirectoryBrowser(new DirectoryBrowserOptions
+        {
+            FileProvider = privateProvider,
             RequestPath = "/private"
         });
 
         // --- MIRROR ---
+        var mirrorProvider = new PhysicalFileProvider(mirrorRoot);
         app.UseStaticFiles(new StaticFileOptions
         {
-            FileProvider = new PhysicalFileProvider(mirrorRoot),
+            FileProvider = mirrorProvider,
+            RequestPath = "/mirror"
+        });
+        app.UseDirectoryBrowser(new DirectoryBrowserOptions
+        {
+            FileProvider = mirrorProvider,
             RequestPath = "/mirror"
         });
     }
