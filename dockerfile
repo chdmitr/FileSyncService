@@ -15,7 +15,7 @@ FROM alpine:3.22.2 AS runtime
 
 WORKDIR /app
 
-RUN apk upgrade --no-cache && apk add --no-cache icu-libs
+RUN apk upgrade --no-cache && apk add --no-cache icu-libs tzdata
 
 RUN addgroup -S appgroup -g 431 && adduser -S -u 431 -G appgroup appuser
 USER appuser
