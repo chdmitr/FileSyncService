@@ -117,8 +117,11 @@ builder.WebHost.ConfigureKestrel(opt =>
     opt.ListenAnyIP(cfg.Config.Https.Port, listen => listen.UseHttps(cert));
 });
 
+// Триггерим при старте
+var needSyncOnStart = args.Contains("--sync-at-start") || args.Contains("-s");
+
 builder.Services.AddSingleton(cfg);
-builder.Services.AddSingleton<SyncService>();
+builder.Services.AddSingleton(sp => ActivatorUtilities.CreateInstance<SyncService>(sp, needSyncOnStart));
 builder.Services.AddHostedService(provider => provider.GetRequiredService<SyncService>());
 
 var app = builder.Build();
@@ -141,7 +144,7 @@ foreach (var s in cfg.Config.Sync.Schedule)
 logger.LogInformation("--------------------------------------------------");
 
 // Ручной триггер только с localhost
-app.MapPost("/sync/now", async (HttpContext ctx, SyncService sync, ILogger<Program> log) =>
+app.MapPost("/sync/now", async (HttpContext ctx, SyncService sync, ILogger<Program> log, CancellationToken ct) =>
 {
     var remoteIp = ctx.Connection.RemoteIpAddress;
     if (remoteIp == null || !IPAddress.IsLoopback(remoteIp))
@@ -151,21 +154,8 @@ app.MapPost("/sync/now", async (HttpContext ctx, SyncService sync, ILogger<Progr
     }
 
     log.LogInformation("Manual sync triggered from localhost");
-    await sync.SyncAll();
+    await sync.SyncAll(ct);
     return Results.Ok(new { status = "started", time = DateTime.Now });
 });
-
-// Триггерим при старте
-if (args.Contains("--sync-at-start") || args.Contains("-s"))
-{
-    try
-    {
-        await app.Services.GetRequiredService<SyncService>().SyncAll();
-    }
-    catch (Exception ex)
-    {
-        logger.LogError("Sync at start failed: {ex}", ex.Message);
-    }
-}
 
 await app.RunAsync();

@@ -2,16 +2,25 @@ using Cronos;
 
 namespace FileSyncServer.Tasks;
 
-public class SyncService(FileSyncConfig cfg, ILogger<SyncService> log) : BackgroundService
+public class SyncService : BackgroundService
 {
-    private readonly FileSyncConfig _cfg = cfg;
-    private readonly ILogger<SyncService> _logger = log;
+
+    private readonly FileSyncConfig _cfg;
+    private readonly ILogger<SyncService> _logger;
     private readonly HttpClient _client = new()
     {
         Timeout = TimeSpan.FromSeconds(5)
     };
+    private bool _isSyncOnStartup = false;
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public SyncService(FileSyncConfig cfg, ILogger<SyncService> log, bool isSyncOnStartup)
+    {
+        _cfg = cfg;
+        _logger = log;
+        _isSyncOnStartup = isSyncOnStartup;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken ct)
     {
         var schedules = _cfg.Config.Sync.Schedule
             .Select(s => CronExpression.Parse(s, CronFormat.IncludeSeconds))
@@ -19,7 +28,20 @@ public class SyncService(FileSyncConfig cfg, ILogger<SyncService> log) : Backgro
 
         _logger.LogInformation("🕓 Sync scheduler started with {Count} cron rules", schedules.Count);
 
-        while (!stoppingToken.IsCancellationRequested)
+        if (_isSyncOnStartup)
+        {
+            _logger.LogInformation("Sync at start...");
+            try
+            {
+                await SyncAll(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Sync at start failed: {ex}", ex.Message);
+            }
+        }
+
+        while (!ct.IsCancellationRequested)
         {
             var now = DateTime.UtcNow;
             var nextRuns = schedules
@@ -39,12 +61,15 @@ public class SyncService(FileSyncConfig cfg, ILogger<SyncService> log) : Backgro
                 nextRun.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")
             );
 
-            await DelayUntil(nextRun, _logger, stoppingToken);
-            await SyncAll();
+            await DelayUntil(nextRun, ct);
+            if (!ct.IsCancellationRequested)
+            {
+                await SyncAll(ct);
+            }
         }
     }
 
-    public async Task SyncAll()
+    public async Task SyncAll(CancellationToken ct)
     {
         _logger.LogInformation("🔄 Starting synchronization...");
         var mirrorBasePath = Extensions.FileServerExtensions.NormalizePath(_cfg.Files.Mirror!.BasePath);
@@ -59,40 +84,49 @@ public class SyncService(FileSyncConfig cfg, ILogger<SyncService> log) : Backgro
                 var localFile = Path.Combine(dir, kv.Key);
                 var remoteUrl = kv.Value;
 
-                await SyncFile(localFile, remoteUrl);
+                await SyncFile(localFile, remoteUrl, ct);
             }
         }
 
         _logger.LogInformation("✅ Synchronization finished.");
     }
 
-    private async Task SyncFile(string localPath, string url)
+    private async Task SyncFile(string localPath, string url, CancellationToken ct)
     {
         try
         {
-            var req = new HttpRequestMessage(HttpMethod.Get, url);
+            byte[] bytes;
 
-            if (File.Exists(localPath))
+            using (var req = new HttpRequestMessage(HttpMethod.Get, url))
             {
-                var info = new FileInfo(localPath);
-                req.Headers.IfModifiedSince = info.LastWriteTimeUtc;
+                if (File.Exists(localPath))
+                {
+                    var info = new FileInfo(localPath);
+                    req.Headers.IfModifiedSince = info.LastWriteTimeUtc;
+                }
+
+                using (var resp = await _client.SendAsync(req, ct))
+                {
+                    if (resp.StatusCode == System.Net.HttpStatusCode.NotModified)
+                    {
+                        _logger.LogInformation("No update for {File}", localPath);
+                        return;
+                    }
+                    resp.EnsureSuccessStatusCode();
+                    bytes = await resp.Content.ReadAsByteArrayAsync(ct);
+                }
             }
 
-            var resp = await _client.SendAsync(req);
-            if (resp.StatusCode == System.Net.HttpStatusCode.NotModified)
-            {
-                _logger.LogInformation("No update for {File}", localPath);
-                return;
-            }
-
-            resp.EnsureSuccessStatusCode();
-            var bytes = await resp.Content.ReadAsByteArrayAsync();
-            await File.WriteAllBytesAsync(localPath, bytes);
+            await File.WriteAllBytesAsync(localPath, bytes, ct);
             _logger.LogInformation("Updated {File} ({Size} bytes)", localPath, bytes.Length);
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
             _logger.LogWarning("Timeout while downloading {Url}", url);
+        }
+        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "Operation is canceled");
         }
         catch (Exception ex)
         {
@@ -104,34 +138,19 @@ public class SyncService(FileSyncConfig cfg, ILogger<SyncService> log) : Backgro
     /// Safely delays the log until a specified time.
     /// Supports very long intervals and rounds the log to the nearest minute.
     /// </summary>
-    private static async Task DelayUntil(DateTime nextRun, ILogger logger, CancellationToken stoppingToken)
+    private async Task DelayUntil(DateTime nextRun, CancellationToken ct)
     {
         TimeSpan delay = nextRun - DateTime.UtcNow;
-        if (delay <= TimeSpan.Zero)
-            return;
-
         var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
 
-        while (delay > TimeSpan.Zero)
+        while (delay > TimeSpan.Zero && !ct.IsCancellationRequested)
         {
             var chunk = delay > maxDelay ? maxDelay : delay;
 
             if (chunk > TimeSpan.FromMinutes(1))
-            {
-                var rounded = TimeSpan.FromMinutes(Math.Ceiling(chunk.TotalMinutes));
-                if (logger.IsEnabled(LogLevel.Information))
-                    logger.LogInformation("⏳ [DelayUntil] Waiting {Delay:dd\\.hh\\:mm} until next run...", rounded);
-            }
+                _logger.LogInformation("⏳ [DelayUntil] Waiting {Delay:dd\\.hh\\:mm\\:ss} until next run...", chunk);
 
-            try
-            {
-                await Task.Delay(chunk, stoppingToken);
-            }
-            catch (TaskCanceledException)
-            {
-                logger.LogInformation("Delay cancelled.");
-                return;
-            }
+            await Task.Delay(chunk, ct).ContinueWith(_ => {}, TaskContinuationOptions.OnlyOnCanceled);
 
             delay = nextRun - DateTime.UtcNow;
         }

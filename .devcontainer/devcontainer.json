@@ -6,7 +6,8 @@
 		"ghcr.io/devcontainers/features/common-utils:2": { // https://github.com/devcontainers/features/tree/main/src/common-utils
 			"upgradePackages": false
 		},
-		"ghcr.io/hwaien/devcontainer-features/match-host-time-zone": {}
+		"ghcr.io/hwaien/devcontainer-features/match-host-time-zone": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {}
 	},
 	"remoteEnv": {
 		"TZ": "Asia/Yekaterinburg"
