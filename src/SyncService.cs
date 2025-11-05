@@ -14,7 +14,7 @@ namespace FileSyncServer
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             var schedules = _cfg.Config.Sync.Schedule
-                .Select(s => CronExpression.Parse(s))
+                .Select(s => CronExpression.Parse(s, CronFormat.IncludeSeconds))
                 .ToList();
 
             _logger.LogInformation("🕓 Sync scheduler started with {Count} cron rules", schedules.Count);
