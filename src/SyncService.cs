@@ -17,7 +17,7 @@ namespace FileSyncServer
                 .Select(s => CronExpression.Parse(s))
                 .ToList();
 
-            _logger.LogInformation("Sync scheduler started with {Count} cron rules", schedules.Count);
+            _logger.LogInformation("🕓 Sync scheduler started with {Count} cron rules", schedules.Count);
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -28,16 +28,18 @@ namespace FileSyncServer
                     .Select(t => t!.Value)
                     .ToList();
 
-                var delay = nextRuns.Count != 0 ? nextRuns.Min() - now : TimeSpan.FromHours(12);
-                if (delay < TimeSpan.Zero) delay = TimeSpan.FromMinutes(1);
+                var nextRun = nextRuns.Count != 0 ? nextRuns.Min() : now.AddHours(12);
+                if (nextRun < now)
+                    nextRun = now.AddMinutes(1);
 
+                var delay = nextRun - now;
                 _logger.LogInformation(
                     "Next sync in {Delay:dd\\.hh\\:mm\\:ss} at {NextRun}",
                     delay,
-                    nextRuns.Min().ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")
+                    nextRun.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")
                 );
-                await Task.Delay(delay, stoppingToken);
 
+                await DelayUntil(nextRun, _logger, stoppingToken);
                 await SyncAll();
             }
         }
@@ -60,6 +62,7 @@ namespace FileSyncServer
                     await SyncFile(localFile, remoteUrl);
                 }
             }
+
             _logger.LogInformation("✅ Synchronization finished.");
         }
 
@@ -94,6 +97,43 @@ namespace FileSyncServer
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error syncing {File}", localPath);
+            }
+        }
+
+        /// <summary>
+        /// Safely delays the log until a specified time.
+        /// Supports very long intervals and rounds the log to the nearest minute.
+        /// </summary>
+        private static async Task DelayUntil(DateTime nextRun, ILogger logger, CancellationToken stoppingToken)
+        {
+            TimeSpan delay = nextRun - DateTime.UtcNow;
+            if (delay <= TimeSpan.Zero)
+                return;
+
+            var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
+
+            while (delay > TimeSpan.Zero)
+            {
+                var chunk = delay > maxDelay ? maxDelay : delay;
+
+                if (chunk > TimeSpan.FromMinutes(1))
+                {
+                    var rounded = TimeSpan.FromMinutes(Math.Ceiling(chunk.TotalMinutes));
+                    if (logger.IsEnabled(LogLevel.Information))
+                        logger.LogInformation("⏳ [DelayUntil] Waiting {Delay:dd\\.hh\\:mm} until next run...", rounded);
+                }
+
+                try
+                {
+                    await Task.Delay(chunk, stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    logger.LogInformation("Delay cancelled.");
+                    return;
+                }
+
+                delay = nextRun - DateTime.UtcNow;
             }
         }
     }
