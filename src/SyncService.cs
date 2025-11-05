@@ -31,7 +31,11 @@ namespace FileSyncServer
                 var delay = nextRuns.Count != 0 ? nextRuns.Min() - now : TimeSpan.FromHours(12);
                 if (delay < TimeSpan.Zero) delay = TimeSpan.FromMinutes(1);
 
-                _logger.LogInformation("Next sync in {Delay} at {NextRun}", delay, nextRuns.Min().ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz"));
+                _logger.LogInformation(
+                    "Next sync in {Delay:dd\\.hh\\:mm\\:ss} at {NextRun}",
+                    delay,
+                    nextRuns.Min().ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")
+                );
                 await Task.Delay(delay, stoppingToken);
 
                 await SyncAll();
