@@ -150,15 +150,7 @@ public class SyncService : BackgroundService
             if (chunk > TimeSpan.FromMinutes(1))
                 _logger.LogInformation("⏳ [DelayUntil] Waiting {Delay:dd\\.hh\\:mm\\:ss} until next run...", chunk);
 
-            try
-            {
-                await Task.Delay(chunk, ct);
-            }
-            catch (TaskCanceledException)
-            {
-                _logger.LogInformation("Delay cancelled.");
-                return;
-            }
+            await Task.Delay(chunk, ct).ContinueWith(_ => {}, CancellationToken.None);
 
             delay = nextRun - DateTime.UtcNow;
         }
