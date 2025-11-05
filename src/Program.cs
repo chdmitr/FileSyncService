@@ -3,6 +3,7 @@ using System.Security.Cryptography.X509Certificates;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 using FileSyncServer;
+using FileSyncServer.Tasks;
 
 const string configPath = "config.yml";
 
