@@ -7,13 +7,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>bin</OutputPath>
-
-
-    <!-- Опционально: публикация как self-contained бинарь -->
-    <PublishTrimmed>false</PublishTrimmed>
-    <PublishSingleFile>false</PublishSingleFile>
-    <AssemblyName>FileSyncServer</AssemblyName>
-    <RootNamespace>FileSyncServer</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
