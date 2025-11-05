@@ -13,7 +13,7 @@ config:
     cert_path_private: ../cert/server.key
   sync:
     schedule:
-      - '0 * * * * *'
+      - 0 * * * * *
 
 files:
   private: ../data/private/
