@@ -6,6 +6,7 @@ using FileSyncService;
 using FileSyncService.Tasks;
 using FileSyncService.Extensions;
 using FileServerExtensions = FileSyncService.Extensions.FileServerExtensions;
+using Microsoft.Extensions.FileProviders;
 
 const string configPath = "config.yml";
 
@@ -160,7 +161,6 @@ app.MapPost("/sync/now", async (HttpContext ctx, FileSyncTask sync, ILogger<Prog
 });
 
 // Main page
-var indexPath = Path.Combine(AppContext.BaseDirectory, "Static", "index.html");
 // Status data serialization
 app.MapGet("/meta.json", (FileSyncConfig cfg, FileSyncTask sync) =>
 {
@@ -182,13 +182,19 @@ app.MapGet("/meta.json", (FileSyncConfig cfg, FileSyncTask sync) =>
         }
     });
 });
-// Отдача HTML при запросе на /
-app.MapGet("/", async context =>
+app.UseDefaultFiles(new DefaultFilesOptions
 {
-    context.Response.ContentType = "text/html; charset=utf-8";
-    await context.Response.SendFileAsync(indexPath);
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "Static")
+    ),
+    DefaultFileNames = ["index.html"]
 });
-
-
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "Static")
+    ),
+    ServeUnknownFileTypes = true
+});
 
 await app.RunAsync();
