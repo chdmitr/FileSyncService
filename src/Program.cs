@@ -161,6 +161,7 @@ app.MapPost("/sync/now", async (HttpContext ctx, FileSyncTask sync, ILogger<Prog
 });
 
 // Main page
+
 // Status data serialization
 app.MapGet("/meta.json", (FileSyncConfig cfg, FileSyncTask sync) =>
 {
@@ -182,13 +183,8 @@ app.MapGet("/meta.json", (FileSyncConfig cfg, FileSyncTask sync) =>
         }
     });
 });
-app.UseDefaultFiles(new DefaultFilesOptions
-{
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "Static")
-    ),
-    DefaultFileNames = ["index.html"]
-});
+
+// Default static
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(
