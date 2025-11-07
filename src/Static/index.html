@@ -109,15 +109,15 @@
             second: '2-digit',
             timeZoneName: 'longOffset'
           }
-          return value ? new Date(value).toLocaleString(undefined, options) : "–––";
+          return value ? new Date(value).toLocaleString(undefined, options) : "–";
         }
 
         const s = meta.syncStatus;
         if (s) {
           document.getElementById('lastRun').textContent = localTime(s.lastRun);
           document.getElementById('nextRun').textContent = localTime(s.nextRun);
-          document.getElementById('duration').textContent = s.duration || "–––";
-          document.getElementById('updatedFiles').textContent = s.updatedFiles ?? "–––";
+          document.getElementById('duration').textContent = s.duration || "–";
+          document.getElementById('updatedFiles').textContent = s.updatedFiles ?? "–";
 
           const st = document.getElementById('status');
           if (s.status === "ok" || s.status === "Ok") {
@@ -134,7 +134,7 @@
             st.className = "";
           }
 
-          document.getElementById('error').textContent = s.error || "–––";
+          document.getElementById('error').textContent = s.error || "–";
         } else {
           document.getElementById('syncStatus').innerHTML =
             "<tr><td colspan='2'>Sync has not been performed yet</td></tr>";
