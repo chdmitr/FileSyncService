@@ -10,6 +10,8 @@ using Microsoft.Extensions.FileProviders;
 
 const string configPath = "config.yml";
 
+#region Preparatory check
+
 // Проверяем наличие файла конфигурации
 if (!File.Exists(configPath))
 {
@@ -17,7 +19,6 @@ if (!File.Exists(configPath))
     Console.Error.WriteLine("Please ensure config.yml exists in the working directory.");
     Environment.Exit(1);
 }
-
 string yaml;
 try
 {
@@ -91,6 +92,9 @@ foreach (var auth in cfg.Config.Auth)
     auth.Username = ResolveEnv(auth.Username, "username");
     auth.Password = ResolveEnv(auth.Password, "password");
 }
+#endregion
+
+#region Builder prepare
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -126,24 +130,35 @@ builder.Services.AddSingleton(cfg);
 builder.Services.AddSingleton(sp => ActivatorUtilities.CreateInstance<FileSyncTask>(sp, needSyncOnStart));
 builder.Services.AddHostedService(provider => provider.GetRequiredService<FileSyncTask>());
 
+#endregion
+
+#region Web app configure
+
 var app = builder.Build();
 
 app.UseMiddleware<AuthMiddleware>(cfg);
 app.MapStaticFiles(cfg);
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("--------------------------------------------------");
-logger.LogInformation(" FileSyncService started");
-logger.LogInformation("--------------------------------------------------");
-logger.LogInformation("HTTPS port:        {Port}", cfg.Config.Https.Port);
-logger.LogInformation("Log file:          {LogPath}", Path.GetFullPath(logPath));
-logger.LogInformation("Public directory:  {Path}", FileSyncService.Extensions.FileServerExtensions.NormalizePath(cfg.Files.Public));
-logger.LogInformation("Private directory: {Path}", FileSyncService.Extensions.FileServerExtensions.NormalizePath(cfg.Files.Private));
-logger.LogInformation("Mirror root:       {Path}", FileSyncService.Extensions.FileServerExtensions.NormalizePath("data/mirror"));
-logger.LogInformation("Sync schedule:");
-foreach (var s in cfg.Config.Sync.Schedule)
-    logger.LogInformation("  - {Schedule}", s);
-logger.LogInformation("--------------------------------------------------");
+if (logger.IsEnabled(LogLevel.Information))
+{
+    logger.LogInformation("--------------------------------------------------");
+    logger.LogInformation(" FileSyncService started");
+    logger.LogInformation("--------------------------------------------------");
+    logger.LogInformation("HTTPS port:        {Port}", cfg.Config.Https.Port);
+    logger.LogInformation("Log file:          {LogPath}", Path.GetFullPath(logPath));
+    logger.LogInformation("Public directory:  {Path}", FileServerExtensions.NormalizePath(cfg.Files.Public));
+    logger.LogInformation("Private directory: {Path}", FileServerExtensions.NormalizePath(cfg.Files.Private));
+    logger.LogInformation("Mirror root:       {Path}", FileServerExtensions.NormalizePath("data/mirror"));
+    logger.LogInformation("Sync schedule:");
+    foreach (var s in cfg.Config.Sync.Schedule)
+        logger.LogInformation("  - {Schedule}", s);
+    logger.LogInformation("--------------------------------------------------");
+}
+
+#endregion
+
+#region Endpoints
 
 // Ручной триггер только с localhost
 app.MapPost("/sync/now", async (HttpContext ctx, FileSyncTask sync, ILogger<Program> log, CancellationToken ct) =>
@@ -159,8 +174,6 @@ app.MapPost("/sync/now", async (HttpContext ctx, FileSyncTask sync, ILogger<Prog
     await sync.SyncAll(ct);
     return Results.Ok(new { status = "started", time = DateTime.Now });
 });
-
-// Main page
 
 // Status data serialization
 app.MapGet("/meta.json", (FileSyncConfig cfg, FileSyncTask sync) =>
@@ -184,13 +197,18 @@ app.MapGet("/meta.json", (FileSyncConfig cfg, FileSyncTask sync) =>
     });
 });
 
-// Default static
+// Main page
+var fp = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "Static"));
+app.UseDefaultFiles(new DefaultFilesOptions
+{
+    FileProvider = fp,
+});
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "Static")
-    ),
+    FileProvider = fp,
     ServeUnknownFileTypes = true
 });
+
+#endregion
 
 await app.RunAsync();
