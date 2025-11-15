@@ -2,6 +2,9 @@
 
 set -e
 
+# Build
+docker build -t filesync_service .
+
 mkdir -p ./docker/data
 mkdir -p ./docker/log
 sudo chmod 777 -R ./docker ./cert
