@@ -136,9 +136,6 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<FileSy
 
 var app = builder.Build();
 
-app.UseMiddleware<AuthMiddleware>(cfg);
-app.MapStaticFiles(cfg);
-
 app.Use(async (context, next) =>
 {
     var ip = context.Connection.RemoteIpAddress?.ToString() ?? "-";
@@ -152,6 +149,9 @@ app.Use(async (context, next) =>
 
     await next();
 });
+
+app.UseMiddleware<AuthMiddleware>(cfg);
+app.MapStaticFiles(cfg);
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 if (logger.IsEnabled(LogLevel.Information))
