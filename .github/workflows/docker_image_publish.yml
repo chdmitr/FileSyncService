@@ -73,10 +73,3 @@ jobs:
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Delete source code assets
-        run: |
-          gh release delete-asset ${{ github.ref_name }} "Source code (zip)" --repo ${{ github.repository }}
-          gh release delete-asset ${{ github.ref_name }} "Source code (tar.gz)" --repo ${{ github.repository }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
