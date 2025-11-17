@@ -46,7 +46,7 @@ jobs:
       - name: Extract tag message
         id: tag_message
         run: |
-          TAG_MESSAGE=$(git for-each-ref refs/tags/${{ github.ref_name }} --format="%(contents)")
+          TAG_MESSAGE=$(git for-each-ref refs/tags/${GITHUB_REF_NAME} --format="%(contents)")
           if [ -z "$TAG_MESSAGE" ]; then
             TAG_MESSAGE="No description provided"
           fi
