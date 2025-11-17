@@ -139,6 +139,20 @@ var app = builder.Build();
 app.UseMiddleware<AuthMiddleware>(cfg);
 app.MapStaticFiles(cfg);
 
+app.Use(async (context, next) =>
+{
+    var ip = context.Connection.RemoteIpAddress?.ToString() ?? "-";
+    context.RequestServices
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("RequestLogger")
+        .LogInformation("Request {Method} {Path} from {IP}",
+            context.Request.Method,
+            context.Request.Path,
+            ip);
+
+    await next();
+});
+
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 if (logger.IsEnabled(LogLevel.Information))
 {
