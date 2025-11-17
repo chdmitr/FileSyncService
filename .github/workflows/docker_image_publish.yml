@@ -62,7 +62,9 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          generate_release_notes: false
+          files: ''
+          append_body: true
+          generate_release_notes: true
           body: |
             ## Description
             ${{ steps.tag_message.outputs.message }}
