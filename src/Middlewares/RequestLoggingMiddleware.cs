@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace FileSyncService.Middlewares;
 
 public class RequestLoggingMiddleware
@@ -13,15 +15,17 @@ public class RequestLoggingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        var sw = Stopwatch.StartNew();
         var ip = GetClientIP(context);
         var method = context.Request.Method;
-        var path = context.Request.Path.ToString();
+        var path = context.Request.Path;
         var userAgent = context.Request.Headers.UserAgent.ToString();
 
         context.Response.OnStarting(() =>
         {
             var status = context.Response.StatusCode;
-            LogRequest(method, path, status, ip, userAgent);
+            var elapsed = sw.ElapsedMilliseconds;
+            LogRequest(method, path, status, ip, userAgent, elapsed);
             return Task.CompletedTask;
         });
 
@@ -31,15 +35,15 @@ public class RequestLoggingMiddleware
         }
         catch (Exception ex)
         {
+            var elapsed = sw.ElapsedMilliseconds;
             _logger.LogError(ex,
-                "HTTP Error: [{Method}] [{Path}] from [{IP}]",
-                method, path, ip);
-
+                "HTTP Error: [{Method}] [{Path}] from [{IP}] - {Elapsed}ms",
+                method, path, ip, elapsed);
             throw;
         }
     }
 
-    private void LogRequest(string method, string path, int statusCode, string ip, string userAgent)
+    private void LogRequest(string method, string path, int statusCode, string ip, string userAgent, long elapsedMs)
     {
         var logLevel = GetLogLevel(statusCode);
 
@@ -50,16 +54,16 @@ public class RequestLoggingMiddleware
         {
             _logger.Log(
                 logLevel,
-                "HTTP [{Method}] [{Path}] => [{StatusCode}] from [{IP}] - UserAgent: {UserAgent}",
-                method, path, statusCode, ip, userAgent
+                "HTTP [{Method}] [{Path}] => [{StatusCode}] from [{IP}] - {Elapsed}ms - UserAgent: {UserAgent}",
+                method, path, statusCode, ip, elapsedMs, userAgent
             );
         }
         else
         {
             _logger.Log(
                 logLevel,
-                "HTTP [{Method}] [{Path}] => [{StatusCode}] from [{IP}]",
-                method, path, statusCode, ip
+                "HTTP [{Method}] [{Path}] => [{StatusCode}] from [{IP}] - {Elapsed}ms",
+                method, path, statusCode, ip, elapsedMs
             );
         }
     }
@@ -77,7 +81,8 @@ public class RequestLoggingMiddleware
 
     private static string GetClientIP(HttpContext context)
     {
-        var unknownIp = "-";
+        const string unknownIp = "-";
+
         if (context.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor))
             return forwardedFor.FirstOrDefault()?.Split(',').First().Trim() ?? unknownIp;
 
