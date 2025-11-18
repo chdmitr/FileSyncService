@@ -18,29 +18,24 @@ public class RequestLoggingMiddleware
         var path = context.Request.Path.ToString();
         var userAgent = context.Request.Headers.UserAgent.ToString();
 
-        Stream originalBody = context.Response.Body;
-        using var responseBody = new MemoryStream();
-        context.Response.Body = responseBody;
+        context.Response.OnStarting(() =>
+        {
+            var status = context.Response.StatusCode;
+            LogRequest(method, path, status, ip, userAgent);
+            return Task.CompletedTask;
+        });
 
         try
         {
             await _next(context);
-            LogRequest(method, path, context.Response.StatusCode, ip, userAgent);
         }
         catch (Exception ex)
         {
-            _logger.LogError(
-                ex,
-                "HTTP Error: [{Method}] [{Path}] => [{StatusCode}] from [{IP}]",
-                method, path, context.Response.StatusCode, ip
-            );
+            _logger.LogError(ex,
+                "HTTP Error: [{Method}] [{Path}] from [{IP}]",
+                method, path, ip);
+
             throw;
-        }
-        finally
-        {
-            responseBody.Seek(0, SeekOrigin.Begin);
-            await responseBody.CopyToAsync(originalBody);
-            context.Response.Body = originalBody;
         }
     }
 
@@ -68,7 +63,6 @@ public class RequestLoggingMiddleware
             );
         }
     }
-
 
     private static LogLevel GetLogLevel(int statusCode)
     {
